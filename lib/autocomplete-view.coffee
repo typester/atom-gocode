@@ -1,5 +1,5 @@
 _ = require 'underscore-plus'
-{$, $$, Range, SelectListView}  = require 'atom'
+{$, $$, Range, SelectListView, BufferedProcess}  = require 'atom'
 
 module.exports =
 class AutocompleteView extends SelectListView
@@ -10,9 +10,12 @@ class AutocompleteView extends SelectListView
   originalCursorPosition: null
   aboveCursor: false
 
+  candidates: []
+  numPrefix: 0
+
   initialize: (@editorView) ->
     super
-    @addClass('autocomplete popover-list')
+    @addClass('autocomplete popover-list gocode')
     {@editor} = @editorView
     @handleEvents()
     @setCurrentBuffer(@editor.getBuffer())
@@ -29,13 +32,13 @@ class AutocompleteView extends SelectListView
     @list.on 'mousewheel', (event) -> event.stopPropagation()
 
     @editorView.on 'editor:path-changed', => @setCurrentBuffer(@editor.getBuffer())
-    @editorView.command 'autocomplete:toggle', =>
+    @editorView.command 'gocode:toggle', =>
       if @hasParent()
         @cancel()
       else
         @attach()
-    @editorView.command 'autocomplete:next', => @selectNextItemView()
-    @editorView.command 'autocomplete:previous', => @selectPreviousItemView()
+    @editorView.command 'gocode:next', => @selectNextItemView()
+    @editorView.command 'gocode:previous', => @selectPreviousItemView()
 
     @filterEditorView.preempt 'textInput', ({originalEvent}) =>
       text = originalEvent.data
@@ -65,20 +68,6 @@ class AutocompleteView extends SelectListView
     completions = completions.map (properties) -> _.valueForKeyPath(properties, 'editor.completions')
     _.uniq(_.flatten(completions))
 
-  buildWordList: ->
-    wordHash = {}
-    if atom.config.get('autocomplete.includeCompletionsFromAllBuffers')
-      buffers = atom.project.getBuffers()
-    else
-      buffers = [@currentBuffer]
-    matches = []
-    matches.push(buffer.getText().match(@wordRegex)) for buffer in buffers
-    wordHash[word] ?= true for word in _.flatten(matches) when word
-    wordHash[word] ?= true for word in @getCompletionsForCursorScope() when word
-
-    @wordList = Object.keys(wordHash).sort (word1, word2) ->
-      word1.toLowerCase().localeCompare(word2.toLowerCase())
-
   confirmed: (match) ->
     @editor.getSelections().forEach (selection) -> selection.clear()
 
@@ -105,16 +94,49 @@ class AutocompleteView extends SelectListView
 
     return @cancel() unless @allPrefixAndSuffixOfSelectionsMatch()
 
-    @buildWordList()
-    matches = @findMatchesForCurrentSelection()
-    @setItems(matches)
+    @numPrefix = 0
+    @candidates = []
 
-    if matches.length is 1
-      @confirmSelection()
-    else
-      @editorView.appendToLinesView(this)
-      @setPosition()
-      @focusFilterEditor()
+    cursor = @editor.getCursorBufferPosition();
+    offset = @editor.getBuffer().characterIndexForPosition(cursor)
+
+    out = ""
+    process = new BufferedProcess
+      command: "gocode"
+      args: ["-f=json", "autocomplete", offset]
+      options:
+        stdio: "pipe"
+      stdout: (o) ->
+        out += o
+      stderr: (o) ->
+        console.log o
+      exit: (code) =>
+        if code or not out
+          console.log "gocode exited status:", code
+        else
+          res = JSON.parse(out)
+
+          @numPrefix = res[0]
+          @candidates = res[1]
+
+          items = []
+          for c in @candidates
+            prefix = c.name.substring 0, @numPrefix
+            items.push
+              word: c.name
+              prefix: prefix
+              suffix: ""
+
+          @setItems items
+
+          if items.length is 1
+            @confirmSelection()
+          else
+            @editorView.appendToLinesView(this)
+            @setPosition()
+            @focusFilterEditor()
+    process.process.stdin.write(atom.workspace.activePaneItem.buffer.cachedText);
+    process.process.stdin.end();
 
   setPosition: ->
     {left, top} = @editorView.pixelPositionForScreenPosition(@originalCursorPosition)
@@ -131,18 +153,6 @@ class AutocompleteView extends SelectListView
       @css(left: left, top: top - height, bottom: 'inherit')
     else
       @css(left: left, top: potentialTop, bottom: 'inherit')
-
-  findMatchesForCurrentSelection: ->
-    selection = @editor.getSelection()
-    {prefix, suffix} = @prefixAndSuffixOfSelection(selection)
-
-    if (prefix.length + suffix.length) > 0
-      regex = new RegExp("^#{prefix}.+#{suffix}$", "i")
-      currentWord = prefix + @editor.getSelectedText() + suffix
-      for word in @wordList when regex.test(word) and word != currentWord
-        {prefix, suffix, word}
-    else
-      {word, prefix, suffix} for word in @wordList
 
   replaceSelectedTextWithMatch: (match) ->
     newSelectedBufferRanges = []
