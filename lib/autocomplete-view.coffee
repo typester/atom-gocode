@@ -100,8 +100,6 @@ class AutocompleteView extends SelectListView
     cursor = @editor.getCursorBufferPosition();
     offset = @editor.getBuffer().characterIndexForPosition(cursor)
 
-    console.log "start gocode"
-
     out = ""
     process = new BufferedProcess
       command: "gocode"
@@ -113,7 +111,6 @@ class AutocompleteView extends SelectListView
       stderr: (o) ->
         console.log o
       exit: (code) =>
-        console.log "gocode exit:", code
         if code or not out
           console.log "gocode exited status:", code
         else
