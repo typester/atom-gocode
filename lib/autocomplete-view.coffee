@@ -125,7 +125,6 @@ class AutocompleteView extends SelectListView
           items = []
           for c in @candidates
             prefix = c.name.substring 0, @numPrefix
-            suffix = c.name.substring @numPrefix, c.name.length - 1
             items.push
               word: c.name
               prefix: prefix
