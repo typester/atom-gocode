@@ -1,12 +1,12 @@
 {
-  "name": "autocomplete",
-  "version": "0.28.0",
+  "name": "gocode",
+  "version": "0.0.0",
   "main": "./lib/autocomplete",
   "description": "Display possible completions in the editor with `ctrl-space`.",
   "activationEvents": {
-    "autocomplete:toggle": ".editor"
+    "gocode:toggle": ".editor"
   },
-  "repository": "https://github.com/atom/autocomplete",
+  "repository": "https://github.com/typester/atom-gocode",
   "engines": {
     "atom": "*"
   },
