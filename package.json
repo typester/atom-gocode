@@ -2,7 +2,7 @@
   "name": "gocode",
   "version": "0.0.0",
   "main": "./lib/autocomplete",
-  "description": "Display possible completions in the editor with `ctrl-space`.",
+  "description": "Golang auto completions by gocode",
   "activationEvents": {
     "gocode:toggle": ".editor"
   },
