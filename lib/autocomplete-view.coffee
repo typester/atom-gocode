@@ -119,6 +119,8 @@ class AutocompleteView extends SelectListView
           @numPrefix = res[0]
           @candidates = res[1]
 
+          return unless @candidates
+
           items = []
           for c in @candidates
             prefix = c.name.substring 0, @numPrefix
